@@ -16,9 +16,9 @@ st.markdown("""
 def load_data():
     try:
         # Load the exact files provided
-        quotes_df = pd.read_excel('2026_August/AMX/AMX Quotes-01-31Aug2026.xlsx')
-        sales_df = pd.read_excel('2026_August/AMX/AMX Sales-01-31Aug2026.xlsx')
-        calendar_df = pd.read_excel('2026_August/AMX/Planning calendar-all.xlsx')
+        quotes_df = pd.read_excel('2026_August/AMX/AMX_Quotes-01-31Aug2026.xlsx')
+        sales_df = pd.read_excel('2026_August/AMX/AMX_Sales-01-31Aug2026.xlsx')
+        calendar_df = pd.read_excel('2026_August/AMX/Planning_calendar-all.xlsx')
         support_df = pd.read_excel('2026_August/AMX/KS-amx_cases_2026-08-01_to_2026-08-31.xlsx')
         return quotes_df, sales_df, calendar_df, support_df
     except Exception as e:

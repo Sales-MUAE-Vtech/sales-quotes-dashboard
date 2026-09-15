@@ -168,8 +168,6 @@ if not amx_full_summary.empty:
 else:
     st.info("No AMX data available for the selected Account Manager(s).")
 
-st.markdown("---")
-
 # ==========================================
 # SECTION B: TECHNICAL SUPPORT REPORT
 # ==========================================

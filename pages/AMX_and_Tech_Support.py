@@ -20,11 +20,7 @@ def load_data():
         calendar_df = pd.read_excel('2026_August/AMX/Planning_calendar-all.xlsx', engine='calamine')
         support_df = pd.read_excel('2026_August/AMX/KS-amx_cases_2026-08-01_to_2026-08-31.xlsx', engine='calamine')
         
-        # --- RENAME COLUMNS HERE ---
-        quotes_df = quotes_df.rename(columns={'Rep Name': 'Account Manager', 'Doc. Cur. Amount': 'Amount'})
-        sales_df = sales_df.rename(columns={'Rep Name': 'Account Manager', 'Net Sales2': 'Amount'})
-        
-        # Also rename in calendar_df just in case it uses 'Rep Name' instead of 'Account Manager'
+        # Standardize calendar just in case it uses 'Rep Name'
         if 'Rep Name' in calendar_df.columns:
             calendar_df = calendar_df.rename(columns={'Rep Name': 'Account Manager'})
             
@@ -34,12 +30,6 @@ def load_data():
         return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
 quotes_df, sales_df, calendar_df, support_df = load_data()
-
-# --- TEMPORARY DEBUGGING CODE ---
-st.write("ACTUAL Quotes Columns:", quotes_df.columns.tolist())
-st.write("ACTUAL Sales Columns:", sales_df.columns.tolist())
-st.stop() 
-# --------------------------------
 
 # ==========================================
 # 3. Sidebar Filters
@@ -89,19 +79,19 @@ if not calendar_df.empty and 'Activity Type' in calendar_df.columns and 'Account
 else:
     activities_summary = pd.DataFrame(columns=['Appointments Made', 'Calls Made', 'AMX Demos Made'])
 
-# 2. Quotes
-if not quotes_df.empty and 'Currency' in quotes_df.columns and 'Account Manager' in quotes_df.columns:
-    q_count = pd.crosstab(quotes_df['Account Manager'], quotes_df['Currency']).reindex(columns=['AED', 'USD', 'SAR'], fill_value=0)
+# 2. Quotes (Updated to look for 'Quote Currency')
+if not quotes_df.empty and 'Quote Currency' in quotes_df.columns and 'Account Manager' in quotes_df.columns:
+    q_count = pd.crosstab(quotes_df['Account Manager'], quotes_df['Quote Currency']).reindex(columns=['AED', 'USD', 'SAR'], fill_value=0)
     q_count.columns = ['Quotes in AED Made', 'Quotes in USD Made', 'Quotes in SAR Made']
     
-    q_val = quotes_df.pivot_table(index='Account Manager', columns='Currency', values='Amount', aggfunc='sum', fill_value=0).reindex(columns=['AED', 'USD', 'SAR'], fill_value=0)
+    q_val = quotes_df.pivot_table(index='Account Manager', columns='Quote Currency', values='Amount', aggfunc='sum', fill_value=0).reindex(columns=['AED', 'USD', 'SAR'], fill_value=0)
     q_val.columns = ['Quotes in AED Value', 'Quotes in USD Value', 'Quotes in SAR Value']
     
     quotes_summary = pd.concat([q_count, q_val], axis=1)
 else:
     quotes_summary = pd.DataFrame(columns=['Quotes in AED Made', 'Quotes in USD Made', 'Quotes in SAR Made', 'Quotes in AED Value', 'Quotes in USD Value', 'Quotes in SAR Value'])
 
-# 3. Sales
+# 3. Sales (Still uses 'Currency')
 if not sales_df.empty and 'Currency' in sales_df.columns and 'Account Manager' in sales_df.columns:
     s_count = pd.crosstab(sales_df['Account Manager'], sales_df['Currency']).reindex(columns=['AED', 'USD', 'SAR'], fill_value=0)
     s_count.columns = ['No. of Sales Made in AED', 'No. of Sales Made in USD', 'No. of Sales Made in SAR']

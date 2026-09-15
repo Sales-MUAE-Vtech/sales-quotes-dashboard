@@ -15,10 +15,10 @@ st.markdown("""
 
 @st.cache_data(max_entries=3)
 def load_data():
-    sales_26 = pd.read_excel('2026_Aug/B_Inv_MPUAE-Aug2026.xlsx', engine='calamine')
-    sales_25 = pd.read_excel('2026_Aug/B.1_Inv_MPUAE-Aug2025.xlsx', engine='calamine')
-    quotes_26 = pd.read_excel('2026_Aug/A_SQ_MPUAE-Aug2026.xlsx', engine='calamine')
-    quotes_25 = pd.read_excel('2026_Aug/A.1_SQ_MPUAE-Aug2025.xlsx', engine='calamine')
+    sales_26 = pd.read_excel('2026_August/B_Inv_MPUAE-Aug2026.xlsx', engine='calamine')
+    sales_25 = pd.read_excel('2026_August/B.1_Inv_MPUAE-Aug2025.xlsx', engine='calamine')
+    quotes_26 = pd.read_excel('2026_August/A_SQ_MPUAE-Aug2026.xlsx', engine='calamine')
+    quotes_25 = pd.read_excel('2026_August/A.1_SQ_MPUAE-Aug2025.xlsx', engine='calamine')
     
     sales_26['Year'], sales_25['Year'] = '2026', '2025'
     quotes_26['Year'], quotes_25['Year'] = '2026', '2025'

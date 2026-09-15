@@ -1,7 +1,6 @@
-streamlit
+streamlit>=1.36.0
 pandas
 openpyxl
 python-calamine
 plotly
 xlsxwriter
-streamlit>=1.36.0

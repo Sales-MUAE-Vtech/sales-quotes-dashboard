@@ -35,6 +35,12 @@ def load_data():
 
 quotes_df, sales_df, calendar_df, support_df = load_data()
 
+# --- TEMPORARY DEBUGGING CODE ---
+st.write("ACTUAL Quotes Columns:", quotes_df.columns.tolist())
+st.write("ACTUAL Sales Columns:", sales_df.columns.tolist())
+st.stop() 
+# --------------------------------
+
 # ==========================================
 # 3. Sidebar Filters
 # ==========================================

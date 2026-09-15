@@ -15,7 +15,6 @@ st.markdown("""
 @st.cache_data
 def load_data():
     try:
-        # Notice the added engine='calamine' at the end of each line
         quotes_df = pd.read_excel('2026_August/AMX/AMX_Quotes-01-31Aug2026.xlsx', engine='calamine')
         sales_df = pd.read_excel('2026_August/AMX/AMX_Sales-01-31Aug2026.xlsx', engine='calamine')
         calendar_df = pd.read_excel('2026_August/AMX/Planning_calendar-all.xlsx', engine='calamine')
@@ -24,7 +23,7 @@ def load_data():
     except Exception as e:
         st.error(f"Error loading files: {e}")
         return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
-        
+
 quotes_df, sales_df, calendar_df, support_df = load_data()
 
 # ==========================================
@@ -32,14 +31,14 @@ quotes_df, sales_df, calendar_df, support_df = load_data()
 # ==========================================
 st.sidebar.header("Filter Dashboard")
 
-# Safely extract unique Account Managers across all AMX files
+# Safely extract unique Rep Names across all AMX files
 amx_managers = []
 for df in [quotes_df, sales_df, calendar_df]:
-    if 'Account Manager' in df.columns:
-        amx_managers.extend(df['Account Manager'].dropna().unique().tolist())
+    if 'Rep Name' in df.columns:
+        amx_managers.extend(df['Rep Name'].dropna().unique().tolist())
 unique_managers = list(set(amx_managers))
 
-selected_manager = st.sidebar.multiselect("Select Account Manager", sorted(unique_managers))
+selected_manager = st.sidebar.multiselect("Select Rep Name", sorted(unique_managers))
 
 # Safely extract unique Tech Support Reps
 unique_techs = []
@@ -49,12 +48,16 @@ selected_tech = st.sidebar.multiselect("Select Tech Support Rep", sorted(unique_
 
 # Apply Filters
 if selected_manager:
-    if not quotes_df.empty: quotes_df = quotes_df[quotes_df['Account Manager'].isin(selected_manager)]
-    if not sales_df.empty: sales_df = sales_df[sales_df['Account Manager'].isin(selected_manager)]
-    if not calendar_df.empty: calendar_df = calendar_df[calendar_df['Account Manager'].isin(selected_manager)]
+    if not quotes_df.empty and 'Rep Name' in quotes_df.columns: 
+        quotes_df = quotes_df[quotes_df['Rep Name'].isin(selected_manager)]
+    if not sales_df.empty and 'Rep Name' in sales_df.columns: 
+        sales_df = sales_df[sales_df['Rep Name'].isin(selected_manager)]
+    if not calendar_df.empty and 'Rep Name' in calendar_df.columns: 
+        calendar_df = calendar_df[calendar_df['Rep Name'].isin(selected_manager)]
 
 if selected_tech:
-    if not support_df.empty: support_df = support_df[support_df['Support Rep'].isin(selected_tech)]
+    if not support_df.empty and 'Support Rep' in support_df.columns: 
+        support_df = support_df[support_df['Support Rep'].isin(selected_tech)]
 
 # ==========================================
 # SECTION A: AMX SALES & ACTIVITIES
@@ -62,9 +65,9 @@ if selected_tech:
 st.header("🏢 AMX Department: Sales & Activities")
 
 # 1. Activities (Calendar)
-if not calendar_df.empty and 'Activity Type' in calendar_df.columns:
+if not calendar_df.empty and 'Activity Type' in calendar_df.columns and 'Rep Name' in calendar_df.columns:
     activities_summary = pd.crosstab(
-        calendar_df['Account Manager'], 
+        calendar_df['Rep Name'], 
         calendar_df['Activity Type']
     ).reindex(columns=['Appointment', 'Call', 'AMX Product Demo'], fill_value=0)
     activities_summary.columns = ['Appointments Made', 'Calls Made', 'AMX Demos Made']
@@ -72,11 +75,11 @@ else:
     activities_summary = pd.DataFrame(columns=['Appointments Made', 'Calls Made', 'AMX Demos Made'])
 
 # 2. Quotes
-if not quotes_df.empty and 'Currency' in quotes_df.columns:
-    q_count = pd.crosstab(quotes_df['Account Manager'], quotes_df['Currency']).reindex(columns=['AED', 'USD', 'SAR'], fill_value=0)
+if not quotes_df.empty and 'Currency' in quotes_df.columns and 'Rep Name' in quotes_df.columns:
+    q_count = pd.crosstab(quotes_df['Rep Name'], quotes_df['Currency']).reindex(columns=['AED', 'USD', 'SAR'], fill_value=0)
     q_count.columns = ['Quotes in AED Made', 'Quotes in USD Made', 'Quotes in SAR Made']
     
-    q_val = quotes_df.pivot_table(index='Account Manager', columns='Currency', values='Amount', aggfunc='sum', fill_value=0).reindex(columns=['AED', 'USD', 'SAR'], fill_value=0)
+    q_val = quotes_df.pivot_table(index='Rep Name', columns='Currency', values='Amount', aggfunc='sum', fill_value=0).reindex(columns=['AED', 'USD', 'SAR'], fill_value=0)
     q_val.columns = ['Quotes in AED Value', 'Quotes in USD Value', 'Quotes in SAR Value']
     
     quotes_summary = pd.concat([q_count, q_val], axis=1)
@@ -84,15 +87,15 @@ else:
     quotes_summary = pd.DataFrame(columns=['Quotes in AED Made', 'Quotes in USD Made', 'Quotes in SAR Made', 'Quotes in AED Value', 'Quotes in USD Value', 'Quotes in SAR Value'])
 
 # 3. Sales
-if not sales_df.empty and 'Currency' in sales_df.columns:
-    s_count = pd.crosstab(sales_df['Account Manager'], sales_df['Currency']).reindex(columns=['AED', 'USD', 'SAR'], fill_value=0)
+if not sales_df.empty and 'Currency' in sales_df.columns and 'Rep Name' in sales_df.columns:
+    s_count = pd.crosstab(sales_df['Rep Name'], sales_df['Currency']).reindex(columns=['AED', 'USD', 'SAR'], fill_value=0)
     s_count.columns = ['No. of Sales Made in AED', 'No. of Sales Made in USD', 'No. of Sales Made in SAR']
     
-    s_val = sales_df.pivot_table(index='Account Manager', columns='Currency', values='Amount', aggfunc='sum', fill_value=0).reindex(columns=['AED', 'USD', 'SAR'], fill_value=0)
+    s_val = sales_df.pivot_table(index='Rep Name', columns='Currency', values='Amount', aggfunc='sum', fill_value=0).reindex(columns=['AED', 'USD', 'SAR'], fill_value=0)
     s_val.columns = ['Sales Value in AED', 'Sales Value in USD', 'Sales Value in SAR']
     
     if 'Converted AED Amount' in sales_df.columns:
-        s_converted = sales_df.groupby('Account Manager')['Converted AED Amount'].sum().rename('Sales Value Converted to AED')
+        s_converted = sales_df.groupby('Rep Name')['Converted AED Amount'].sum().rename('Sales Value Converted to AED')
     else:
         s_converted = pd.Series(dtype=float, name='Sales Value Converted to AED')
         
@@ -121,7 +124,7 @@ if not amx_full_summary.empty:
     format_dict = {col: "{:,.2f}" for col in float_cols}
     st.dataframe(amx_full_summary.style.format(format_dict), use_container_width=True)
 else:
-    st.info("No AMX data available for the selected Account Manager(s).")
+    st.info("No AMX data available for the selected Rep Name(s).")
 
 st.markdown("---")
 
@@ -207,7 +210,7 @@ with col1:
         st.download_button(
             label="📊 Download AMX Report (Excel)",
             data=amx_excel_data,
-            file_name="AMX_Activities_Quotes_Sales_Summary.xlsx",
+            file_name="AMX_Activities_Quotes_Sales_Summary-2026-Aug.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             type="primary"
         )
@@ -227,7 +230,7 @@ with col2:
         st.download_button(
             label="🛠️ Download Tech Support Report (Excel)",
             data=tech_excel_data,
-            file_name="AMX_Tech_Support_Summary-Aug2026.xlsx",
+            file_name="AMX_Tech_Support_Summary-2026-Aug.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             type="primary"
         )

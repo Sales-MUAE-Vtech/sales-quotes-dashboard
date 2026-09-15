@@ -75,23 +75,26 @@ if not calendar_df.empty and 'Activity Type' in calendar_df.columns and 'Account
         calendar_df['Account Manager'], 
         calendar_df['Activity Type']
     ).reindex(columns=['Appointment', 'Call', 'AMX Product Demo'], fill_value=0)
-    activities_summary.columns = ['Appointments Made', 'Calls Made', 'AMX Demos Made']
+    activities_summary.columns = ['Appointments Made', 'Calls Made', 'AMX Product Demo Made']
 else:
-    activities_summary = pd.DataFrame(columns=['Appointments Made', 'Calls Made', 'AMX Demos Made'])
+    activities_summary = pd.DataFrame(columns=['Appointments Made', 'Calls Made', 'AMX Product Demo Made'])
 
-# 2. Quotes (Updated to look for 'Quote Currency')
-if not quotes_df.empty and 'Quote Currency' in quotes_df.columns and 'Account Manager' in quotes_df.columns:
-    q_count = pd.crosstab(quotes_df['Account Manager'], quotes_df['Quote Currency']).reindex(columns=['AED', 'USD', 'SAR'], fill_value=0)
-    q_count.columns = ['Quotes in AED Made', 'Quotes in USD Made', 'Quotes in SAR Made']
+# 2. Quotes 
+if not quotes_df.empty and 'Currency' in quotes_df.columns and 'Account Manager' in quotes_df.columns:
+    q_count = pd.crosstab(quotes_df['Account Manager'], quotes_df['Currency']).reindex(columns=['AED', 'USD', 'SAR', 'EUR'], fill_value=0)
+    q_count.columns = ['No. of Quotes Made in AED', 'No. of Quotes Made in USD', 'No. of Quotes Made in SAR', 'No. of Quotes Made in EUR']
     
-    q_val = quotes_df.pivot_table(index='Account Manager', columns='Quote Currency', values='Amount', aggfunc='sum', fill_value=0).reindex(columns=['AED', 'USD', 'SAR'], fill_value=0)
-    q_val.columns = ['Quotes in AED Value', 'Quotes in USD Value', 'Quotes in SAR Value']
+    q_val = quotes_df.pivot_table(index='Account Manager', columns='Currency', values='Amount', aggfunc='sum', fill_value=0).reindex(columns=['AED', 'USD', 'SAR', 'EUR'], fill_value=0)
+    q_val.columns = ['Quotes Value in AED', 'Quotes Value in USD', 'Quotes Value in SAR', 'Quotes Value in EUR']
     
     quotes_summary = pd.concat([q_count, q_val], axis=1)
 else:
-    quotes_summary = pd.DataFrame(columns=['Quotes in AED Made', 'Quotes in USD Made', 'Quotes in SAR Made', 'Quotes in AED Value', 'Quotes in USD Value', 'Quotes in SAR Value'])
+    quotes_summary = pd.DataFrame(columns=[
+        'No. of Quotes Made in AED', 'No. of Quotes Made in USD', 'No. of Quotes Made in SAR', 'No. of Quotes Made in EUR',
+        'Quotes Value in AED', 'Quotes Value in USD', 'Quotes Value in SAR', 'Quotes Value in EUR'
+    ])
 
-# 3. Sales (Still uses 'Currency')
+# 3. Sales 
 if not sales_df.empty and 'Currency' in sales_df.columns and 'Account Manager' in sales_df.columns:
     s_count = pd.crosstab(sales_df['Account Manager'], sales_df['Currency']).reindex(columns=['AED', 'USD', 'SAR'], fill_value=0)
     s_count.columns = ['No. of Sales Made in AED', 'No. of Sales Made in USD', 'No. of Sales Made in SAR']
@@ -106,27 +109,61 @@ if not sales_df.empty and 'Currency' in sales_df.columns and 'Account Manager' i
         
     sales_summary = pd.concat([s_count, s_val, s_converted], axis=1)
 else:
-    sales_summary = pd.DataFrame(columns=['No. of Sales Made in AED', 'No. of Sales Made in USD', 'No. of Sales Made in SAR', 'Sales Value in AED', 'Sales Value in USD', 'Sales Value in SAR', 'Sales Value Converted to AED'])
+    sales_summary = pd.DataFrame(columns=[
+        'No. of Sales Made in AED', 'No. of Sales Made in USD', 'No. of Sales Made in SAR', 
+        'Sales Value in AED', 'Sales Value in USD', 'Sales Value in SAR', 'Sales Value Converted to AED'
+    ])
 
-# Combine all AMX metrics
+# Combine all AMX metrics exactly like the sample report
+amx_full_summary = pd.concat([activities_summary, quotes_summary, sales_summary], axis=1).fillna(0)
+
+# Make sure we have the exact column order from your Excel file
 amx_metrics_order = [
-    'Appointments Made', 'Calls Made', 'AMX Demos Made',
-    'Quotes in AED Made', 'Quotes in AED Value',
-    'Quotes in USD Made', 'Quotes in USD Value',
-    'Quotes in SAR Made', 'Quotes in SAR Value',
+    'Appointments Made', 'Calls Made', 'AMX Product Demo Made',
+    'No. of Quotes Made in AED', 'Quotes Value in AED',
+    'No. of Quotes Made in USD', 'Quotes Value in USD',
+    'No. of Quotes Made in SAR', 'Quotes Value in SAR',
+    'No. of Quotes Made in EUR', 'Quotes Value in EUR',
     'No. of Sales Made in AED', 'Sales Value in AED',
     'No. of Sales Made in USD', 'Sales Value in USD',
-    'No. of Sales Made in SAR', 'Sales Value in SAR',
-    'Sales Value Converted to AED'
+    'Sales Value Converted to AED',
+    'No. of Sales Made in SAR', 'Sales Value in SAR'
 ]
 
-amx_full_summary = pd.concat([activities_summary, quotes_summary, sales_summary], axis=1).fillna(0)
-existing_cols = [col for col in amx_metrics_order if col in amx_full_summary.columns]
-amx_full_summary = amx_full_summary[existing_cols]
+# Ensure missing columns are added with 0s
+for col in amx_metrics_order:
+    if col not in amx_full_summary.columns:
+        amx_full_summary[col] = 0
 
+amx_full_summary = amx_full_summary[amx_metrics_order]
+
+# Add a "TOTAL" row at the bottom
 if not amx_full_summary.empty:
-    float_cols = amx_full_summary.select_dtypes(include=['float64']).columns
+    amx_full_summary.loc['TOTAL'] = amx_full_summary.sum(numeric_only=True)
+
+    # Set up the Multi-Level Header (like the Excel file)
+    columns_multiindex = []
+    for col in amx_full_summary.columns:
+        if col in ['Appointments Made', 'Calls Made', 'AMX Product Demo Made']:
+            columns_multiindex.append(('CRM', col))
+        elif 'Quote' in col:
+            columns_multiindex.append(('QUOTATIONS MADE', col))
+        elif 'Sale' in col:
+            columns_multiindex.append(('SALES MADE', col))
+        else:
+            columns_multiindex.append(('', col))
+            
+    amx_full_summary.columns = pd.MultiIndex.from_tuples(columns_multiindex)
+    amx_full_summary.index.name = "Account Manager"
+
+    # Format numbers properly (2 decimal places for values, whole numbers for counts)
+    float_cols = [c for c in amx_full_summary.columns if 'Value' in c[1] or 'Converted' in c[1]]
+    int_cols = [c for c in amx_full_summary.columns if c not in float_cols]
+    
     format_dict = {col: "{:,.2f}" for col in float_cols}
+    for col in int_cols:
+        format_dict[col] = "{:,.0f}"
+
     st.dataframe(amx_full_summary.style.format(format_dict), use_container_width=True)
 else:
     st.info("No AMX data available for the selected Account Manager(s).")

@@ -101,7 +101,7 @@ if selected_manager:
 # ==========================================
 # SECTION A: AMX SALES & ACTIVITIES
 # ==========================================
-st.header("🏢 AMX Department: Sales & Activities")
+st.header("🏢 AMX Department: Sales & CRM Activities")
 
 if not calendar_df.empty and 'Activity Type' in calendar_df.columns and 'Account Manager' in calendar_df.columns:
     activities_summary = pd.crosstab(calendar_df['Account Manager'], calendar_df['Activity Type']).reindex(columns=['Appointment', 'Call', 'AMX Product Demo'], fill_value=0)
@@ -209,7 +209,7 @@ else:
 # ==========================================
 # SECTION B: TECHNICAL SUPPORT REPORT
 # ==========================================
-st.header("🛠️ Technical Support Report")
+st.header("🛠️ Technical Support Report (AMX Dept)")
 
 status_df = pd.DataFrame()
 mode_df = pd.DataFrame()

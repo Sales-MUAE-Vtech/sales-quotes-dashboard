@@ -21,22 +21,31 @@ def load_data():
         support_df = pd.read_excel('2026_August/AMX/KS-amx_cases_2026-08-01_to_2026-08-31.xlsx', engine='calamine')
         
         # --- FIX COLUMNS ---
-        # 1. Standardize Quote Currency
         if 'Quote Currency' in quotes_df.columns:
             quotes_df = quotes_df.rename(columns={'Quote Currency': 'Currency'})
             
-        # 2. Standardize calendar just in case it uses 'Rep Name' instead of 'Account Manager'
         if 'Rep Name' in calendar_df.columns:
             calendar_df = calendar_df.rename(columns={'Rep Name': 'Account Manager'})
             
-        # --- CLEAN UP INVISIBLE SPACES (Safely) ---
+        # (CRITICAL FIX): If Account Manager is empty in Sales, use the Sales Rep name instead!
+        if 'Sales Rep' in sales_df.columns:
+            if 'Account Manager' not in sales_df.columns:
+                sales_df['Account Manager'] = sales_df['Sales Rep']
+            else:
+                sales_df['Account Manager'] = sales_df['Account Manager'].fillna(sales_df['Sales Rep'])
+
+        # --- CLEAN UP INVISIBLE SPACES & CAPITALIZATION ---
+        # This absolutely forces all names to match perfectly across all 3 files
         for df in [quotes_df, sales_df, calendar_df]:
             if 'Account Manager' in df.columns:
-                # Strip spaces without messing up exact capitalization of names
-                df['Account Manager'] = df['Account Manager'].apply(lambda x: str(x).strip() if pd.notna(x) else x)
+                df['Account Manager'] = df['Account Manager'].apply(
+                    lambda x: str(x).strip().title() if pd.notna(x) and str(x).strip() != '' and str(x).lower() != 'nan' else pd.NA
+                )
             
             if 'Currency' in df.columns:
-                df['Currency'] = df['Currency'].apply(lambda x: str(x).strip().upper() if pd.notna(x) else x)
+                df['Currency'] = df['Currency'].apply(
+                    lambda x: str(x).strip().upper() if pd.notna(x) and str(x).strip() != '' and str(x).lower() != 'nan' else pd.NA
+                )
                 
         return quotes_df, sales_df, calendar_df, support_df
     except Exception as e:
@@ -57,6 +66,7 @@ for df in [quotes_df, sales_df, calendar_df]:
     if 'Account Manager' in df.columns:
         amx_managers.extend(df['Account Manager'].dropna().unique().tolist())
 unique_managers = list(set(amx_managers))
+unique_managers = [m for m in unique_managers if str(m) not in ['NaT', 'nan', 'NaN', 'None']]
 
 selected_manager = st.sidebar.multiselect("Select Account Manager", sorted(unique_managers))
 
@@ -69,7 +79,6 @@ if selected_manager:
     if not calendar_df.empty and 'Account Manager' in calendar_df.columns: 
         calendar_df = calendar_df[calendar_df['Account Manager'].isin(selected_manager)]
 
-# Note: All Tech Support filters have been removed as requested.
 
 # ==========================================
 # SECTION A: AMX SALES & ACTIVITIES
@@ -124,7 +133,6 @@ else:
 # Combine all AMX metrics exactly like the sample report
 amx_full_summary = pd.concat([activities_summary, quotes_summary, sales_summary], axis=1).fillna(0)
 
-# Make sure we have the exact column order from your Excel file
 amx_metrics_order = [
     'Appointments Made', 'Calls Made', 'AMX Product Demo Made',
     'No. of Quotes Made in AED', 'Quotes Value in AED',
@@ -137,7 +145,6 @@ amx_metrics_order = [
     'No. of Sales Made in SAR', 'Sales Value in SAR'
 ]
 
-# Ensure missing columns are added with 0s
 for col in amx_metrics_order:
     if col not in amx_full_summary.columns:
         amx_full_summary[col] = 0
@@ -148,7 +155,6 @@ amx_full_summary = amx_full_summary[amx_metrics_order]
 if not amx_full_summary.empty:
     amx_full_summary.loc['TOTAL'] = amx_full_summary.sum(numeric_only=True)
 
-    # Set up the Multi-Level Header (like the Excel file)
     columns_multiindex = []
     for col in amx_full_summary.columns:
         if col in ['Appointments Made', 'Calls Made', 'AMX Product Demo Made']:
@@ -163,7 +169,6 @@ if not amx_full_summary.empty:
     amx_full_summary.columns = pd.MultiIndex.from_tuples(columns_multiindex)
     amx_full_summary.index.name = "Account Manager"
 
-    # Format numbers properly (2 decimal places for values, whole numbers for counts)
     float_cols = [c for c in amx_full_summary.columns if 'Value' in c[1] or 'Converted' in c[1]]
     int_cols = [c for c in amx_full_summary.columns if c not in float_cols]
     
@@ -187,39 +192,50 @@ if not support_df.empty:
     col1, col2 = st.columns(2)
     
     with col1:
-        st.subheader("Ticket Status Summary")
-        expected_statuses = ['CLOSED', 'IN PROGRESS', 'ESCALATED', 'REOPENED', 'OTHER']
-        total_tickets = len(support_df)
+        st.subheader("Ticket Category Summary")
         
-        if 'Status' in support_df.columns:
-            support_df['Status'] = support_df['Status'].astype(str).str.upper()
-            status_counts = support_df['Status'].value_counts()
+        # Dynamically find the Category and Ticket_ID columns
+        cat_col = next((c for c in support_df.columns if str(c).strip().lower() == 'category'), None)
+        id_col = next((c for c in support_df.columns if str(c).strip().lower() in ['ticket_id', 'ticket id']), None)
+        
+        if cat_col:
+            support_df[cat_col] = support_df[cat_col].astype(str).str.strip().str.upper()
+            
+            # Count the total unique ticket IDs
+            if id_col:
+                total_tickets = support_df[id_col].nunique()
+                cat_counts = support_df.groupby(cat_col)[id_col].nunique()
+            else:
+                total_tickets = len(support_df)
+                cat_counts = support_df[cat_col].value_counts()
+                
+            cat_data = {"Category": ["TOTAL TICKETS"]}
+            cat_data["Category"].extend([str(c) for c in cat_counts.index])
+            
+            counts = [total_tickets]
+            counts.extend(cat_counts.values)
+            
+            status_df = pd.DataFrame({"Category": cat_data["Category"], "Count": counts})
+            st.dataframe(status_df, hide_index=True, use_container_width=True)
         else:
-            status_counts = pd.Series(dtype=int)
-            
-        status_data = {"Metric": ["TOTAL TICKETS"]}
-        status_data["Metric"].extend([f"TICKETS {status}" for status in expected_statuses])
-        
-        counts = [total_tickets]
-        for status in expected_statuses:
-            counts.append(status_counts.get(status, 0))
-            
-        status_df = pd.DataFrame({"Metric": status_data["Metric"], "Count": counts})
-        st.dataframe(status_df, hide_index=True, use_container_width=True)
+            st.info("⚠️ 'Category' column not found in Technical Support file.")
         
     with col2:
         st.subheader("Support Mode Summary")
-        expected_modes = ['ONSITE', 'IN-HOUSE', 'OFFSITE', 'EMAIL', 'PHONE', 'REMOTE', 'OTHERS']
+        # Updated exactly to your requested list
+        expected_modes = ['ON-PHONE', 'REMOTE', 'OFFSITE', 'IN-HOUSE', 'ONSITE', 'TRAINING']
         
-        if 'Support Mode' in support_df.columns:
-            support_df['Support Mode'] = support_df['Support Mode'].astype(str).str.upper()
-            mode_counts = support_df['Support Mode'].value_counts()
+        mode_col = next((c for c in support_df.columns if str(c).strip().lower() == 'support mode'), None)
+        
+        if mode_col:
+            support_df[mode_col] = support_df[mode_col].astype(str).str.strip().str.upper()
+            mode_counts = support_df[mode_col].value_counts()
         else:
             mode_counts = pd.Series(dtype=int)
             
         mode_data = []
         for mode in expected_modes:
-            mode_data.append({"Support Mode": mode, "Total": mode_counts.get(mode, 0)})
+            mode_data.append({"Support Mode": mode.title(), "Total": mode_counts.get(mode, 0)})
             
         mode_df = pd.DataFrame(mode_data)
         st.dataframe(mode_df, hide_index=True, use_container_width=True)
@@ -233,14 +249,12 @@ else:
 st.markdown("---")
 st.subheader("📥 Export Reports")
 
-# Function to convert a single DataFrame to Excel bytes
 def convert_df_to_excel(df, sheet_name="Sheet1"):
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
         df.to_excel(writer, sheet_name=sheet_name, index=sheet_name == "AMX Summary")
     return output.getvalue()
 
-# Function to convert multiple DataFrames to Excel bytes
 def convert_multiple_dfs_to_excel(dfs_dict):
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
@@ -251,7 +265,6 @@ def convert_multiple_dfs_to_excel(dfs_dict):
 col1, col2 = st.columns(2)
 
 with col1:
-    # Button 1: AMX Report Only
     if not amx_full_summary.empty:
         amx_excel_data = convert_df_to_excel(amx_full_summary, sheet_name="AMX Summary")
         st.download_button(
@@ -265,11 +278,10 @@ with col1:
         st.write("No AMX data to export.")
 
 with col2:
-    # Button 2: Tech Support Report Only
     if not status_df.empty or not mode_df.empty:
         tech_support_sheets = {}
         if not status_df.empty:
-            tech_support_sheets['Ticket Status'] = status_df
+            tech_support_sheets['Ticket Categories'] = status_df
         if not mode_df.empty:
             tech_support_sheets['Support Modes'] = mode_df
             

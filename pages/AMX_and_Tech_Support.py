@@ -89,7 +89,7 @@ quotes_df, sales_df, calendar_df, support_df = load_data()
 # 3. Sidebar Filters
 # ==========================================
 st.sidebar.header("Filter Dashboard")
-st.sidebar.subheader("🏢 AMX Sales Filters")
+st.sidebar.subheader(":office: AMX Sales Filters")
 
 selected_manager = st.sidebar.multiselect("Select Account Manager", ALLOWED_REPS)
 
@@ -101,7 +101,7 @@ if selected_manager:
 # ==========================================
 # SECTION A: AMX SALES & ACTIVITIES
 # ==========================================
-st.header("🏢 AMX Department: Sales & CRM Activities")
+st.header(":office: AMX Department: Sales & CRM Activities")
 
 if not calendar_df.empty and 'Activity Type' in calendar_df.columns and 'Account Manager' in calendar_df.columns:
     activities_summary = pd.crosstab(calendar_df['Account Manager'], calendar_df['Activity Type']).reindex(columns=['Appointment', 'Call', 'AMX Product Demo'], fill_value=0)
@@ -209,7 +209,7 @@ else:
 # ==========================================
 # SECTION B: TECHNICAL SUPPORT REPORT
 # ==========================================
-st.header("🛠️ Technical Support Report - AMX Dept")
+st.header(":hammer_and_wrench: Technical Support Report - AMX Dept")
 st.subheader("(Tech Support: Kanagaraj Seeni)")
 
 status_df = pd.DataFrame()
@@ -277,7 +277,7 @@ else:
 # SECTION C: EXPORT TO EXCEL (SEPARATE FILES)
 # ==========================================
 st.markdown("---")
-st.subheader("📥 Export Reports")
+st.subheader(":inbox_tray: Export Reports")
 
 def convert_df_to_excel(df, sheet_name="Sheet1"):
     output = io.BytesIO()
@@ -297,7 +297,7 @@ col1, col2 = st.columns(2)
 with col1:
     if not amx_full_summary.empty:
         amx_excel_data = convert_df_to_excel(amx_full_summary, sheet_name="AMX Summary")
-        st.download_button(label="📊 Download AMX Report (Excel)", data=amx_excel_data, file_name="AMX_Activities_Quotes_Sales_Summary-2026-Aug.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", type="primary")
+        st.download_button(label=":bar_chart: Download AMX Report (Excel)", data=amx_excel_data, file_name="AMX_Activities_Quotes_Sales_Summary-2026-Aug.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", type="primary")
 
 with col2:
     if not status_df.empty or not mode_df.empty:
@@ -305,4 +305,4 @@ with col2:
         if not status_df.empty: tech_support_sheets['Ticket Categories'] = status_df
         if not mode_df.empty: tech_support_sheets['Support Modes'] = mode_df
         tech_excel_data = convert_multiple_dfs_to_excel(tech_support_sheets)
-        st.download_button(label="🛠️ Download Tech Support Report (Excel)", data=tech_excel_data, file_name="Tech_Support_Summary-2026-Aug.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", type="primary")
+        st.download_button(label=":hammer_and_wrench: Download Tech Support Report (Excel)", data=tech_excel_data, file_name="Tech_Support_Summary-2026-Aug.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", type="primary")

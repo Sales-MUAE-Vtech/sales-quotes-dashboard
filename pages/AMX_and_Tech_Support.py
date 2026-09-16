@@ -20,37 +20,66 @@ def load_data():
         calendar_df = pd.read_excel('2026_August/AMX/Planning_calendar-all.xlsx', engine='calamine')
         support_df = pd.read_excel('2026_August/AMX/KS-amx_cases_2026-08-01_to_2026-08-31.xlsx', engine='calamine')
         
-        # --- FIX COLUMNS ---
-        if 'Quote Currency' in quotes_df.columns:
-            quotes_df = quotes_df.rename(columns={'Quote Currency': 'Currency'})
+        # =======================================
+        # --- FIX COLUMNS (Exact Mapping) ---
+        # =======================================
+        
+        # 1. QUOTES FILE MAPPING
+        if 'Rep Name' in quotes_df.columns:
+            quotes_df.rename(columns={'Rep Name': 'Account Manager'}, inplace=True)
+        if 'Doc. Cur. Amount' in quotes_df.columns:
+            quotes_df.rename(columns={'Doc. Cur. Amount': 'Quote Amount'}, inplace=True)
             
-        # 1. Rename 'Rep Name' to 'Account Manager' across all 3 AMX files
+        # 2. SALES FILE MAPPING
+        if 'Rep Name' in sales_df.columns:
+            sales_df.rename(columns={'Rep Name': 'Account Manager'}, inplace=True)
+        if 'Net Sales' in sales_df.columns:
+            sales_df.rename(columns={'Net Sales': 'Sales Amount'}, inplace=True)
+        if 'Net Sales2' in sales_df.columns:
+            sales_df.rename(columns={'Net Sales2': 'Sales Amount in AED'}, inplace=True)
+            
+        # 3. CALENDAR FILE MAPPING
+        if 'Rep Name' in calendar_df.columns:
+            calendar_df.rename(columns={'Rep Name': 'Account Manager'}, inplace=True)
+
+        # 4. TECH SUPPORT MAPPING
+        if 'Support_Mode' in support_df.columns:
+            support_df.rename(columns={'Support_Mode': 'Support Mode'}, inplace=True)
+
+        # =======================================
+        # --- DATA CLEANUP & FORMATTING ---
+        # =======================================
+        
+        # Force any blank Account Managers to be "No Rep Name" across all files (No fallbacks!)
         for df in [quotes_df, sales_df, calendar_df]:
-            if 'Rep Name' in df.columns:
-                df.rename(columns={'Rep Name': 'Account Manager'}, inplace=True)
-            
-            # If for some reason the column is completely missing, create it to prevent crashes
             if 'Account Manager' not in df.columns:
                 df['Account Manager'] = 'No Rep Name'
-
-        # 2. Fix Tech Support Column to account for the underscore
-        if 'Support_Mode' in support_df.columns:
-            support_df = support_df.rename(columns={'Support_Mode': 'Support Mode'})
-
-        # --- CLEAN UP INVISIBLE SPACES & FILL BLANKS ---
-        # This safely strips spaces and forces any blanks to be "No Rep Name"
-        for df in [quotes_df, sales_df, calendar_df]:
-            if 'Account Manager' in df.columns:
-                df['Account Manager'] = df['Account Manager'].apply(
-                    lambda x: str(x).strip().title() if pd.notna(x) and str(x).strip() != '' and str(x).lower() not in ['nan', 'nat', 'none'] else 'No Rep Name'
-                )
-            
-            if 'Currency' in df.columns:
-                df['Currency'] = df['Currency'].apply(
-                    lambda x: str(x).strip().upper() if pd.notna(x) and str(x).strip() != '' and str(x).lower() not in ['nan', 'nat', 'none'] else pd.NA
-                )
                 
+            # Strip invisible spaces and capitalize names so they match perfectly
+            df['Account Manager'] = df['Account Manager'].apply(
+                lambda x: str(x).strip().title() if pd.notna(x) and str(x).strip() != '' and str(x).lower() not in ['nan', 'nat', 'none'] else 'No Rep Name'
+            )
+
+        # Standardize Currencies (removing spaces and making uppercase)
+        if 'Quote Currency' in quotes_df.columns:
+            quotes_df['Quote Currency'] = quotes_df['Quote Currency'].apply(
+                lambda x: str(x).strip().upper() if pd.notna(x) and str(x).strip() != '' and str(x).lower() not in ['nan', 'nat', 'none'] else pd.NA
+            )
+        if 'Currency' in sales_df.columns:
+            sales_df['Currency'] = sales_df['Currency'].apply(
+                lambda x: str(x).strip().upper() if pd.notna(x) and str(x).strip() != '' and str(x).lower() not in ['nan', 'nat', 'none'] else pd.NA
+            )
+
+        # Force Amount columns to be recognized as numbers (prevents math crashes)
+        if 'Quote Amount' in quotes_df.columns:
+            quotes_df['Quote Amount'] = pd.to_numeric(quotes_df['Quote Amount'], errors='coerce').fillna(0)
+        if 'Sales Amount' in sales_df.columns:
+            sales_df['Sales Amount'] = pd.to_numeric(sales_df['Sales Amount'], errors='coerce').fillna(0)
+        if 'Sales Amount in AED' in sales_df.columns:
+            sales_df['Sales Amount in AED'] = pd.to_numeric(sales_df['Sales Amount in AED'], errors='coerce').fillna(0)
+
         return quotes_df, sales_df, calendar_df, support_df
+    
     except Exception as e:
         st.error(f"Error loading files: {e}")
         return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
@@ -69,7 +98,7 @@ for df in [quotes_df, sales_df, calendar_df]:
     if 'Account Manager' in df.columns:
         amx_managers.extend(df['Account Manager'].dropna().unique().tolist())
 unique_managers = list(set(amx_managers))
-unique_managers = [m for m in unique_managers if str(m) not in ['NaT', 'nan', 'NaN', 'None']]
+unique_managers = [m for m in unique_managers if str(m) not in ['NaT', 'nan', 'NaN', 'None', 'No Rep Name']]
 
 selected_manager = st.sidebar.multiselect("Select Account Manager", sorted(unique_managers))
 
@@ -81,7 +110,6 @@ if selected_manager:
         sales_df = sales_df[sales_df['Account Manager'].isin(selected_manager)]
     if not calendar_df.empty and 'Account Manager' in calendar_df.columns: 
         calendar_df = calendar_df[calendar_df['Account Manager'].isin(selected_manager)]
-
 
 # ==========================================
 # SECTION A: AMX SALES & ACTIVITIES
@@ -99,11 +127,11 @@ else:
     activities_summary = pd.DataFrame(columns=['Appointments Made', 'Calls Made', 'AMX Product Demo Made'])
 
 # 2. Quotes 
-if not quotes_df.empty and 'Currency' in quotes_df.columns and 'Account Manager' in quotes_df.columns:
-    q_count = pd.crosstab(quotes_df['Account Manager'], quotes_df['Currency']).reindex(columns=['AED', 'USD', 'SAR', 'EUR'], fill_value=0)
+if not quotes_df.empty and 'Quote Currency' in quotes_df.columns and 'Account Manager' in quotes_df.columns and 'Quote Amount' in quotes_df.columns:
+    q_count = pd.crosstab(quotes_df['Account Manager'], quotes_df['Quote Currency']).reindex(columns=['AED', 'USD', 'SAR', 'EUR'], fill_value=0)
     q_count.columns = ['No. of Quotes Made in AED', 'No. of Quotes Made in USD', 'No. of Quotes Made in SAR', 'No. of Quotes Made in EUR']
     
-    q_val = quotes_df.pivot_table(index='Account Manager', columns='Currency', values='Amount', aggfunc='sum', fill_value=0).reindex(columns=['AED', 'USD', 'SAR', 'EUR'], fill_value=0)
+    q_val = quotes_df.pivot_table(index='Account Manager', columns='Quote Currency', values='Quote Amount', aggfunc='sum', fill_value=0).reindex(columns=['AED', 'USD', 'SAR', 'EUR'], fill_value=0)
     q_val.columns = ['Quotes Value in AED', 'Quotes Value in USD', 'Quotes Value in SAR', 'Quotes Value in EUR']
     
     quotes_summary = pd.concat([q_count, q_val], axis=1)
@@ -114,15 +142,15 @@ else:
     ])
 
 # 3. Sales 
-if not sales_df.empty and 'Currency' in sales_df.columns and 'Account Manager' in sales_df.columns:
+if not sales_df.empty and 'Currency' in sales_df.columns and 'Account Manager' in sales_df.columns and 'Sales Amount' in sales_df.columns:
     s_count = pd.crosstab(sales_df['Account Manager'], sales_df['Currency']).reindex(columns=['AED', 'USD', 'SAR'], fill_value=0)
     s_count.columns = ['No. of Sales Made in AED', 'No. of Sales Made in USD', 'No. of Sales Made in SAR']
     
-    s_val = sales_df.pivot_table(index='Account Manager', columns='Currency', values='Amount', aggfunc='sum', fill_value=0).reindex(columns=['AED', 'USD', 'SAR'], fill_value=0)
+    s_val = sales_df.pivot_table(index='Account Manager', columns='Currency', values='Sales Amount', aggfunc='sum', fill_value=0).reindex(columns=['AED', 'USD', 'SAR'], fill_value=0)
     s_val.columns = ['Sales Value in AED', 'Sales Value in USD', 'Sales Value in SAR']
     
-    if 'Converted AED Amount' in sales_df.columns:
-        s_converted = sales_df.groupby('Account Manager')['Converted AED Amount'].sum().rename('Sales Value Converted to AED')
+    if 'Sales Amount in AED' in sales_df.columns:
+        s_converted = sales_df.groupby('Account Manager')['Sales Amount in AED'].sum().rename('Sales Value Converted to AED')
     else:
         s_converted = pd.Series(dtype=float, name='Sales Value Converted to AED')
         
@@ -136,6 +164,10 @@ else:
 # Combine all AMX metrics exactly like the sample report
 amx_full_summary = pd.concat([activities_summary, quotes_summary, sales_summary], axis=1).fillna(0)
 
+# Filter out "No Rep Name" so it doesn't clutter the final dashboard table unless it is the only thing there
+if 'No Rep Name' in amx_full_summary.index and len(amx_full_summary.index) > 1:
+    amx_full_summary = amx_full_summary.drop('No Rep Name')
+
 amx_metrics_order = [
     'Appointments Made', 'Calls Made', 'AMX Product Demo Made',
     'No. of Quotes Made in AED', 'Quotes Value in AED',
@@ -148,6 +180,7 @@ amx_metrics_order = [
     'No. of Sales Made in SAR', 'Sales Value in SAR'
 ]
 
+# Ensure missing columns are added with 0s
 for col in amx_metrics_order:
     if col not in amx_full_summary.columns:
         amx_full_summary[col] = 0
@@ -227,7 +260,6 @@ if not support_df.empty:
         st.subheader("Support Mode Summary")
         expected_modes = ['ON-PHONE', 'REMOTE', 'OFFSITE', 'IN-HOUSE', 'ONSITE', 'TRAINING']
         
-        # Now accurately searches for 'Support Mode' (since we renamed Support_Mode earlier)
         mode_col = next((c for c in support_df.columns if str(c).strip().lower() in ['support mode', 'support_mode']), None)
         
         if mode_col:

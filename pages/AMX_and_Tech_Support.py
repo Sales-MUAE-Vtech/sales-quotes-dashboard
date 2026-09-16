@@ -209,7 +209,8 @@ else:
 # ==========================================
 # SECTION B: TECHNICAL SUPPORT REPORT
 # ==========================================
-st.header("🛠️ Technical Support Report (AMX Dept)")
+st.header("🛠️ Technical Support Report - AMX Dept")
+st.subheader("(Tech Support: Kanagaraj Seeni)")
 
 status_df = pd.DataFrame()
 mode_df = pd.DataFrame()

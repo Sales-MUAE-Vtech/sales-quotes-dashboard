@@ -20,17 +20,18 @@ def load_data():
     quotes_26 = pd.read_excel('2026_August/A_SQ_MPUAE-Aug2026.xlsx', engine='calamine')
     quotes_25 = pd.read_excel('2026_August/A.1_SQ_MPUAE-Aug2025.xlsx', engine='calamine')
     
-    sales_26['Year'], sales_25['Year'] = '2026', '2025'
-    quotes_26['Year'], quotes_25['Year'] = '2026', '2025'
-    
-    sales = pd.concat([sales_26, sales_25]).rename(columns={'Rep Name': 'Account Manager', 'Net Sales2': 'Amount'})
-    quotes = pd.concat([quotes_26, quotes_25]).rename(columns={'Rep Name': 'Account Manager', 'Doc. Cur. Amount': 'Amount'})
-    
-    sales['Type'] = 'Sales'
+   sales['Type'] = 'Sales'
     quotes['Type'] = 'Quotes'
-    
-    return pd.concat([sales[['Year', 'Account Manager', 'Country', 'Brand Name', 'Amount', 'Type']], 
-                      quotes[['Year', 'Account Manager', 'Country', 'Brand Name', 'Amount', 'Type']]])
+
+    # Rename 'Quote Currency' to 'Currency' so both files match perfectly
+    sales = pd.concat([sales_26, sales_25]).rename(columns={'Rep Name': 'Account Manager', 'Net Sales2': 'Amount'})
+    quotes = pd.concat([quotes_26, quotes_25]).rename(columns={'Rep Name': 'Account Manager', 'Doc. Cur. Amount': 'Amount', 'Quote Currency': 'Currency'})
+
+    # Add 'Currency' to the final returned data
+    return pd.concat([
+        sales[['Year', 'Account Manager', 'Country', 'Brand Name', 'Amount', 'Currency', 'Type']],
+        quotes[['Year', 'Account Manager', 'Country', 'Brand Name', 'Amount', 'Currency', 'Type']]
+    ]) 
 
 df = load_data()
 

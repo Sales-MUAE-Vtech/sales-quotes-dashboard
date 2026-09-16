@@ -20,7 +20,7 @@ def load_data():
     quotes_26 = pd.read_excel('2026_August/A_SQ_MPUAE-Aug2026.xlsx', engine='calamine')
     quotes_25 = pd.read_excel('2026_August/A.1_SQ_MPUAE-Aug2025.xlsx', engine='calamine')
     
-   sales['Type'] = 'Sales'
+    sales['Type'] = 'Sales'
     quotes['Type'] = 'Quotes'
 
     # Rename 'Quote Currency' to 'Currency' so both files match perfectly
@@ -107,12 +107,11 @@ def highlight_subtotals(data):
     styles.loc[sub_total_mask, :] = 'background-color: #f2f2f2; color: darkblue; font-size: 1.15em;'
     
     return styles
-
 # Render Sales Table
-st.subheader("Sales Summary (AED)")
+st.subheader("Sales Summary")
 if not sales_data.empty:
     sales_pivot = pd.pivot_table(sales_data, values='Amount', 
-                                 index=['Year', 'Country', 'Brand Name'], 
+                                 index=['Year', 'Country', 'Brand Name', 'Currency'], 
                                  columns=['Account Manager'], 
                                  aggfunc='sum', margins=True, margins_name='Sub-Total').fillna(0)
     
@@ -126,10 +125,10 @@ else:
     st.info("No sales data available for the selected filters.")
 
 # Render Quotes Table
-st.subheader("Quotes Summary (AED)")
+st.subheader("Quotes Summary")
 if not quotes_data.empty:
     quotes_pivot = pd.pivot_table(quotes_data, values='Amount', 
-                                  index=['Year', 'Country', 'Brand Name'], 
+                                  index=['Year', 'Country', 'Brand Name', 'Currency'], 
                                   columns=['Account Manager'], 
                                   aggfunc='sum', margins=True, margins_name='Sub-Total').fillna(0)
     

@@ -20,10 +20,29 @@ def load_data():
         calendar_df = pd.read_excel('2026_August/AMX/Planning_calendar-all.xlsx', engine='calamine')
         support_df = pd.read_excel('2026_August/AMX/KS-amx_cases_2026-08-01_to_2026-08-31.xlsx', engine='calamine')
         
-        # Standardize calendar just in case it uses 'Rep Name'
+        # --- FIX COLUMNS ---
+        # 1. Standardize Quote Currency
+        if 'Quote Currency' in quotes_df.columns:
+            quotes_df = quotes_df.rename(columns={'Quote Currency': 'Currency'})
+            
+        # 2. Standardize calendar just in case it uses 'Rep Name'
         if 'Rep Name' in calendar_df.columns:
             calendar_df = calendar_df.rename(columns={'Rep Name': 'Account Manager'})
             
+        # 3. Fix Sales File (Use 'Sales Rep' as the Account Manager if necessary)
+        if 'Sales Rep' in sales_df.columns and 'Account Manager' in sales_df.columns:
+            # Overwrite the 'Account Manager' column with the 'Sales Rep' names just in case
+            sales_df['Account Manager'] = sales_df['Sales Rep']
+
+        # --- CLEAN UP INVISIBLE SPACES & CAPITALIZATION ---
+        # This forces every file to match names perfectly (e.g., turns "Manu George " into "Manu George")
+        for df in [quotes_df, sales_df, calendar_df]:
+            if 'Account Manager' in df.columns:
+                df['Account Manager'] = df['Account Manager'].astype(str).str.strip().str.title()
+            
+            if 'Currency' in df.columns:
+                df['Currency'] = df['Currency'].astype(str).str.strip().str.upper()
+                
         return quotes_df, sales_df, calendar_df, support_df
     except Exception as e:
         st.error(f"Error loading files: {e}")

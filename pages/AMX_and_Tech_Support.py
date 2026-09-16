@@ -24,27 +24,30 @@ def load_data():
         if 'Quote Currency' in quotes_df.columns:
             quotes_df = quotes_df.rename(columns={'Quote Currency': 'Currency'})
             
-        if 'Rep Name' in calendar_df.columns:
-            calendar_df = calendar_df.rename(columns={'Rep Name': 'Account Manager'})
+        # 1. Rename 'Rep Name' to 'Account Manager' across all 3 AMX files
+        for df in [quotes_df, sales_df, calendar_df]:
+            if 'Rep Name' in df.columns:
+                df.rename(columns={'Rep Name': 'Account Manager'}, inplace=True)
             
-        # (CRITICAL FIX): If Account Manager is empty in Sales, use the Sales Rep name instead!
-        if 'Sales Rep' in sales_df.columns:
-            if 'Account Manager' not in sales_df.columns:
-                sales_df['Account Manager'] = sales_df['Sales Rep']
-            else:
-                sales_df['Account Manager'] = sales_df['Account Manager'].fillna(sales_df['Sales Rep'])
+            # If for some reason the column is completely missing, create it to prevent crashes
+            if 'Account Manager' not in df.columns:
+                df['Account Manager'] = 'No Rep Name'
 
-        # --- CLEAN UP INVISIBLE SPACES & CAPITALIZATION ---
-        # This absolutely forces all names to match perfectly across all 3 files
+        # 2. Fix Tech Support Column to account for the underscore
+        if 'Support_Mode' in support_df.columns:
+            support_df = support_df.rename(columns={'Support_Mode': 'Support Mode'})
+
+        # --- CLEAN UP INVISIBLE SPACES & FILL BLANKS ---
+        # This safely strips spaces and forces any blanks to be "No Rep Name"
         for df in [quotes_df, sales_df, calendar_df]:
             if 'Account Manager' in df.columns:
                 df['Account Manager'] = df['Account Manager'].apply(
-                    lambda x: str(x).strip().title() if pd.notna(x) and str(x).strip() != '' and str(x).lower() != 'nan' else pd.NA
+                    lambda x: str(x).strip().title() if pd.notna(x) and str(x).strip() != '' and str(x).lower() not in ['nan', 'nat', 'none'] else 'No Rep Name'
                 )
             
             if 'Currency' in df.columns:
                 df['Currency'] = df['Currency'].apply(
-                    lambda x: str(x).strip().upper() if pd.notna(x) and str(x).strip() != '' and str(x).lower() != 'nan' else pd.NA
+                    lambda x: str(x).strip().upper() if pd.notna(x) and str(x).strip() != '' and str(x).lower() not in ['nan', 'nat', 'none'] else pd.NA
                 )
                 
         return quotes_df, sales_df, calendar_df, support_df
@@ -222,10 +225,10 @@ if not support_df.empty:
         
     with col2:
         st.subheader("Support Mode Summary")
-        # Updated exactly to your requested list
         expected_modes = ['ON-PHONE', 'REMOTE', 'OFFSITE', 'IN-HOUSE', 'ONSITE', 'TRAINING']
         
-        mode_col = next((c for c in support_df.columns if str(c).strip().lower() == 'support mode'), None)
+        # Now accurately searches for 'Support Mode' (since we renamed Support_Mode earlier)
+        mode_col = next((c for c in support_df.columns if str(c).strip().lower() in ['support mode', 'support_mode']), None)
         
         if mode_col:
             support_df[mode_col] = support_df[mode_col].astype(str).str.strip().str.upper()

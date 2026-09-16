@@ -31,11 +31,9 @@ def load_data():
             
         # 3. Fix Sales File (Use 'Sales Rep' as the Account Manager if necessary)
         if 'Sales Rep' in sales_df.columns and 'Account Manager' in sales_df.columns:
-            # Overwrite the 'Account Manager' column with the 'Sales Rep' names just in case
             sales_df['Account Manager'] = sales_df['Sales Rep']
 
         # --- CLEAN UP INVISIBLE SPACES & CAPITALIZATION ---
-        # This forces every file to match names perfectly (e.g., turns "Manu George " into "Manu George")
         for df in [quotes_df, sales_df, calendar_df]:
             if 'Account Manager' in df.columns:
                 df['Account Manager'] = df['Account Manager'].astype(str).str.strip().str.title()
@@ -55,7 +53,8 @@ quotes_df, sales_df, calendar_df, support_df = load_data()
 # ==========================================
 st.sidebar.header("Filter Dashboard")
 
-# Safely extract unique Account Managers across all AMX files
+# --- AMX SALES FILTERS ---
+st.sidebar.subheader("🏢 AMX Sales Filters")
 amx_managers = []
 for df in [quotes_df, sales_df, calendar_df]:
     if 'Account Manager' in df.columns:
@@ -64,13 +63,6 @@ unique_managers = list(set(amx_managers))
 
 selected_manager = st.sidebar.multiselect("Select Account Manager", sorted(unique_managers))
 
-# Safely extract unique Tech Support Reps
-unique_techs = []
-if not support_df.empty and 'Support Rep' in support_df.columns:
-    unique_techs = support_df['Support Rep'].dropna().unique().tolist()
-selected_tech = st.sidebar.multiselect("Select Tech Support Rep", sorted(unique_techs))
-
-# Apply Filters
 if selected_manager:
     if not quotes_df.empty and 'Account Manager' in quotes_df.columns: 
         quotes_df = quotes_df[quotes_df['Account Manager'].isin(selected_manager)]
@@ -79,9 +71,31 @@ if selected_manager:
     if not calendar_df.empty and 'Account Manager' in calendar_df.columns: 
         calendar_df = calendar_df[calendar_df['Account Manager'].isin(selected_manager)]
 
-if selected_tech:
-    if not support_df.empty and 'Support Rep' in support_df.columns: 
-        support_df = support_df[support_df['Support Rep'].isin(selected_tech)]
+# --- TECH SUPPORT FILTERS ---
+st.sidebar.markdown("---")
+st.sidebar.subheader("🛠️ Tech Support Filters")
+
+# 1. Country Filter
+if not support_df.empty and 'Country' in support_df.columns:
+    unique_countries = support_df['Country'].astype(str).str.strip().dropna().unique().tolist()
+    selected_country = st.sidebar.multiselect("Select Country", sorted(unique_countries))
+    if selected_country:
+        support_df = support_df[support_df['Country'].astype(str).str.strip().isin(selected_country)]
+
+# 2. Support Mode Filter
+if not support_df.empty and 'Support Mode' in support_df.columns:
+    unique_modes = support_df['Support Mode'].astype(str).str.strip().str.upper().dropna().unique().tolist()
+    selected_mode = st.sidebar.multiselect("Select Support Mode", sorted(unique_modes))
+    if selected_mode:
+        support_df = support_df[support_df['Support Mode'].astype(str).str.strip().str.upper().isin(selected_mode)]
+
+# 3. Status Filter
+if not support_df.empty and 'Status' in support_df.columns:
+    unique_statuses = support_df['Status'].astype(str).str.strip().str.upper().dropna().unique().tolist()
+    selected_status = st.sidebar.multiselect("Select Status", sorted(unique_statuses))
+    if selected_status:
+        support_df = support_df[support_df['Status'].astype(str).str.strip().str.upper().isin(selected_status)]
+
 
 # ==========================================
 # SECTION A: AMX SALES & ACTIVITIES
@@ -237,7 +251,7 @@ if not support_df.empty:
         st.dataframe(mode_df, hide_index=True, use_container_width=True)
 
 else:
-    st.info("No Technical Support data available for the selected Tech Rep(s).")
+    st.info("No Technical Support data available based on your filters.")
 
 # ==========================================
 # SECTION C: EXPORT TO EXCEL (SEPARATE FILES)

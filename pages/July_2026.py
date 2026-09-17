@@ -19,16 +19,22 @@ def load_data():
     sales_25 = pd.read_excel('2026_July/B.1_Inv_MPUAE-Jul2025.xlsx', engine='calamine')
     quotes_26 = pd.read_excel('2026_July/A_SQ_MPUAE-Jul2026.xlsx', engine='calamine')
     quotes_25 = pd.read_excel('2026_July/A.1_SQ_MPUAE-Jul2025.xlsx', engine='calamine')
-    
-# 1. First, combine the files and rename the columns
+
+    # 1. ADD THE YEAR COLUMNS BEFORE COMBINING (This is what went missing!)
+    sales_26['Year'] = '2026'
+    sales_25['Year'] = '2025'
+    quotes_26['Year'] = '2026'
+    quotes_25['Year'] = '2025'
+
+    # 2. Combine the files and rename the columns
     sales = pd.concat([sales_26, sales_25]).rename(columns={'Rep Name': 'Account Manager', 'Net Sales2': 'Amount'})
     quotes = pd.concat([quotes_26, quotes_25]).rename(columns={'Rep Name': 'Account Manager', 'Doc. Cur. Amount': 'Amount', 'Quote Currency': 'Currency'})
 
-    # 2. THEN add the 'Type' column now that the variables exist
+    # 3. Add the 'Type' column
     sales['Type'] = 'Sales'
     quotes['Type'] = 'Quotes'
 
-    # 3. Finally, return the combined data with the Currency column included
+    # 4. Finally, return the combined data with the Currency column included
     return pd.concat([
         sales[['Year', 'Account Manager', 'Country', 'Brand Name', 'Amount', 'Currency', 'Type']],
         quotes[['Year', 'Account Manager', 'Country', 'Brand Name', 'Amount', 'Currency', 'Type']]

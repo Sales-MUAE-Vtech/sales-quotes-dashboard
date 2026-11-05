@@ -20,15 +20,20 @@ def load_data():
     quotes_26 = pd.read_excel('2026_July/A_SQ_MPUAE-Jul2026.xlsx', engine='calamine')
     quotes_25 = pd.read_excel('2026_July/A.1_SQ_MPUAE-Jul2025.xlsx', engine='calamine')
 
-    # 1. ADD THE YEAR COLUMNS BEFORE COMBINING (This is what went missing!)
+    # Drop any duplicate columns automatically in each file
+    for df in [sales_26, sales_25, quotes_26, quotes_25]:
+        df.columns = df.columns.to_series().fillna('') # Handle any blank header names
+        df.loc[:, ~df.columns.duplicated(keep='first')]
+
+    # 1. ADD THE YEAR COLUMNS BEFORE COMBINING
     sales_26['Year'] = '2026'
     sales_25['Year'] = '2025'
     quotes_26['Year'] = '2026'
     quotes_25['Year'] = '2025'
 
     # 2. Combine the files and rename the columns
-    sales = pd.concat([sales_26, sales_25]).rename(columns={'Rep Name': 'Account Manager', 'Net Sales2': 'Amount'})
-    quotes = pd.concat([quotes_26, quotes_25]).rename(columns={'Rep Name': 'Account Manager', 'Doc. Cur. Amount': 'Amount', 'Quote Currency': 'Currency'})
+    sales = pd.concat([sales_26, sales_25], ignore_index=True).rename(columns={'Rep Name': 'Account Manager', 'Net Sales2': 'Amount'})
+    quotes = pd.concat([quotes_26, quotes_25], ignore_index=True).rename(columns={'Rep Name': 'Account Manager', 'Doc. Cur. Amount': 'Amount', 'Quote Currency': 'Currency'})
 
     # 3. Add the 'Type' column
     sales['Type'] = 'Sales'
@@ -38,7 +43,7 @@ def load_data():
     return pd.concat([
         sales[['Year', 'Account Manager', 'Country', 'Brand Name', 'Amount', 'Currency', 'Type']],
         quotes[['Year', 'Account Manager', 'Country', 'Brand Name', 'Amount', 'Currency', 'Type']]
-    ])
+    ], ignore_index=True)
 
 df = load_data()
 

@@ -10,12 +10,14 @@ amx_august = st.Page("pages/AMX_and_Tech_Support.py", title="2026 Aug", icon="�
 # (Make sure these filenames match exactly what you have in your pages folder!)
 sales_august = st.Page("pages/August_2026.py", title="2026 August", icon="💰")
 sales_july = st.Page("pages/July_2026.py", title="2026 July", icon="💰")
+sales_september = st.Page("pages/September_2026.py", title="2026 September", icon="💰")
+sales_october = st.Page("pages/October_2026.py", title="2026 October", icon="💰")
 
 # 2. Group them into sections (Headers)
 pages = {
     "": [home_page],
     "CRM Activities of AMX Account Managers & Tech Support": [amx_august],
-    "Sales & Quotes (MPUAE)": [sales_august, sales_july]
+    "Sales & Quotes (MPUAE)": [sales_august, sales_july, sales_september, sales_october]
 }
 
 # 3. Run the navigation router

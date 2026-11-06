@@ -18,6 +18,12 @@ def load_data():
     quotes_26 = pd.read_excel('2026_July/A_SQ_MPUAE-Jul2026.xlsx', engine='calamine')
     quotes_25 = pd.read_excel('2026_July/A.1_SQ_MPUAE-Jul2025.xlsx', engine='calamine')
 
+    # Automatically clean and make column names unique to prevent InvalidIndexError
+    for d in [sales_26, sales_25, quotes_26, quotes_25]:
+        d.columns = [str(col).strip() for col in d.columns]
+        # Appends a suffix (.1, .2) to any duplicate column names so pandas accepts them
+        d.columns = pd.io.parsers.base_parser.ParserBase({'names': d.columns})._maybe_dedup_names(d.columns)
+
     sales_26['Year'] = '2026'
     sales_25['Year'] = '2025'
     quotes_26['Year'] = '2026'

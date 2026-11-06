@@ -20,10 +20,12 @@ def load_data():
     quotes_26 = pd.read_excel('2026_July/A_SQ_MPUAE-Jul2026.xlsx', engine='calamine')
     quotes_25 = pd.read_excel('2026_July/A.1_SQ_MPUAE-Jul2025.xlsx', engine='calamine')
 
-    # Clean up column names to prevent duplicate index errors
-    for df in [sales_26, sales_25, quotes_26, quotes_25]:
-        df.columns = df.columns.astype(str).str.strip()
-        df.loc[:, ~df.columns.duplicated(keep='first')]
+# Clean up column names and drop duplicates properly
+for df_item in [sales_26, sales_25, quotes_26, quotes_25]:
+    df_item.columns = df_item.columns.astype(str).str.strip()
+    df_item.columns = pd.Index([col if not col.startswith('Unnamed') else '' for col in df_item.columns])
+    # This safely drops duplicate columns in-place
+    df_item = df_item.loc[:, ~df_item.columns.duplicated()]
 	
     # 1. ADD THE YEAR COLUMNS BEFORE COMBINING (This is what went missing!)
     sales_26['Year'] = '2026'

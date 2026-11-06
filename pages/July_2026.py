@@ -1,15 +1,13 @@
 import io
-
 import streamlit as st
 import pandas as pd
 import plotly.express as px
 
-# 1. Page Config and Centered, Multi-line Title
 st.set_page_config(layout="wide")
 st.markdown("""
     <h1 style='text-align: center; margin-bottom: 0px;'>SALES vs QUOTES (MPUAE)</h1>
     <h3 style='text-align: center; margin-top: 5px; font-weight: normal;'>(Jul 2025 vs Jul 2026)</h3>
-	<h4 style='text-align: center; margin-top: 5px; font-weight: normal;'>(Source: SAGE X3)</h4>
+    <h4 style='text-align: center; margin-top: 5px; font-weight: normal;'>(Source: SAGE X3)</h4>
     <br>
 """, unsafe_allow_html=True)
 
@@ -20,32 +18,22 @@ def load_data():
     quotes_26 = pd.read_excel('2026_July/A_SQ_MPUAE-Jul2026.xlsx', engine='calamine')
     quotes_25 = pd.read_excel('2026_July/A.1_SQ_MPUAE-Jul2025.xlsx', engine='calamine')
 
-# Clean up column names and drop duplicates properly
-for df_item in [sales_26, sales_25, quotes_26, quotes_25]:
-    df_item.columns = df_item.columns.astype(str).str.strip()
-    df_item.columns = pd.Index([col if not col.startswith('Unnamed') else '' for col in df_item.columns])
-    # This safely drops duplicate columns in-place
-    df_item = df_item.loc[:, ~df_item.columns.duplicated()]
-	
-    # 1. ADD THE YEAR COLUMNS BEFORE COMBINING (This is what went missing!)
     sales_26['Year'] = '2026'
     sales_25['Year'] = '2025'
     quotes_26['Year'] = '2026'
     quotes_25['Year'] = '2025'
 
-    # 2. Combine the files and rename the columns
     sales = pd.concat([sales_26, sales_25], ignore_index=True).rename(columns={'Rep Name': 'Account Manager', 'Net Sales2': 'Amount'})
     quotes = pd.concat([quotes_26, quotes_25], ignore_index=True).rename(columns={'Rep Name': 'Account Manager', 'Doc. Cur. Amount': 'Amount', 'Quote Currency': 'Currency'})
 
-    # 3. Add the 'Type' column
     sales['Type'] = 'Sales'
     quotes['Type'] = 'Quotes'
 
-    # 4. Finally, return the combined data with the Currency column included
     return pd.concat([
         sales[['Year', 'Account Manager', 'Country', 'Brand Name', 'Amount', 'Currency', 'Type']],
         quotes[['Year', 'Account Manager', 'Country', 'Brand Name', 'Amount', 'Currency', 'Type']]
     ], ignore_index=True)
+
 df = load_data()
 
 st.sidebar.header("Filter Data")
@@ -67,7 +55,6 @@ quotes_data = filtered_df[filtered_df['Type'] == 'Quotes']
 sales_agg = sales_data.groupby('Year')['Amount'].sum().reset_index()
 quotes_agg = quotes_data.groupby('Year')['Amount'].sum().reset_index()
 
-# 2. Charts with un-bolded, black axis values
 col1, col2 = st.columns(2)
 custom_colors = {"2025": "darkblue", "2026": "maroon"}
 
@@ -95,39 +82,29 @@ with col2:
     )
     st.plotly_chart(fig_quotes, use_container_width=True)
 
-
-# 3. Custom Table Styling Logic
 st.markdown("---")
 
 header_styles = [
-    # Column headers (Account Managers) are now colored brown
     {'selector': 'th.col_heading', 'props': [('text-align', 'center'), ('color', 'brown'), ('font-weight', 'bold')]},
-    # Index Names (The titles: "Year", "Country", "Brand Name") are explicitly bolded
     {'selector': 'th.index_name', 'props': [('font-weight', 'bold'), ('color', 'black'), ('text-align', 'left')]},
-    # Row headings (The actual category data like "2025", "Egypt", etc.) remain normal weight
     {'selector': 'th.row_heading', 'props': [('font-weight', 'normal'), ('color', 'black'), ('text-align', 'left')]},
-    # Handles corner blanks appropriately
     {'selector': 'th.blank', 'props': [('font-weight', 'bold'), ('color', 'black')]}
 ]
 
 def highlight_subtotals(data):
     styles = pd.DataFrame('', index=data.index, columns=data.columns)
-    
     if 'Sub-Total' in data.columns:
         styles['Sub-Total'] = 'background-color: #f2f2f2; color: darkblue; font-size: 1.15em;'
-        
     sub_total_mask = [('Sub-Total' in idx) if isinstance(idx, tuple) else (idx == 'Sub-Total') for idx in data.index]
     styles.loc[sub_total_mask, :] = 'background-color: #f2f2f2; color: darkblue; font-size: 1.15em;'
-    
     return styles
-# Render Sales Table
+
 st.subheader("Sales Summary")
 if not sales_data.empty:
     sales_pivot = pd.pivot_table(sales_data, values='Amount', 
                                  index=['Year', 'Country', 'Brand Name', 'Currency'], 
                                  columns=['Account Manager'], 
                                  aggfunc='sum', margins=True, margins_name='Sub-Total').fillna(0)
-    
     format_dict = {col: "{:,.2f}" for col in sales_pivot.columns}
     styled_sales = (sales_pivot.style
                     .format(format_dict)
@@ -137,14 +114,12 @@ if not sales_data.empty:
 else:
     st.info("No sales data available for the selected filters.")
 
-# Render Quotes Table
 st.subheader("Quotes Summary")
 if not quotes_data.empty:
     quotes_pivot = pd.pivot_table(quotes_data, values='Amount', 
                                   index=['Year', 'Country', 'Brand Name', 'Currency'], 
                                   columns=['Account Manager'], 
                                   aggfunc='sum', margins=True, margins_name='Sub-Total').fillna(0)
-    
     format_dict_quotes = {col: "{:,.2f}" for col in quotes_pivot.columns}
     styled_quotes = (quotes_pivot.style
                      .format(format_dict_quotes)
@@ -153,21 +128,17 @@ if not quotes_data.empty:
     st.table(styled_quotes)
 else:
     st.info("No quotes data available for the selected filters.")
-	
+    
 st.markdown("---")
 st.subheader("Export Data")
 
-# Create an in-memory buffer for the Excel file
 buffer = io.BytesIO()
-
-# Write both summary tables into a single Excel file with two distinct tabs
 with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
     if not sales_data.empty:
         sales_pivot.to_excel(writer, sheet_name='Sales Summary')
     if not quotes_data.empty:
         quotes_pivot.to_excel(writer, sheet_name='Quotes Summary')
 
-# Create the download button
 st.download_button(
     label="Download Summaries as Excel",
     data=buffer.getvalue(),

@@ -11,6 +11,22 @@ st.markdown("""
     <br>
 """, unsafe_allow_html=True)
 
+def clean_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Strip whitespace and append suffix (.1, .2) to duplicate column names."""
+    cols = [str(col).strip() for col in df.columns]
+    seen = {}
+    new_cols = []
+    for col in cols:
+        if col not in seen:
+            seen[col] = 0
+            new_cols.append(col)
+        else:
+            seen[col] += 1
+            new_cols.append(f"{col}.{seen[col]}")
+    df = df.copy()
+    df.columns = new_cols
+    return df
+
 @st.cache_data(max_entries=3)
 def load_data():
     sales_26 = pd.read_excel('2026_July/B_Inv_MPUAE-Jul2026.xlsx', engine='calamine')
@@ -18,15 +34,11 @@ def load_data():
     quotes_26 = pd.read_excel('2026_July/A_SQ_MPUAE-Jul2026.xlsx', engine='calamine')
     quotes_25 = pd.read_excel('2026_July/A.1_SQ_MPUAE-Jul2025.xlsx', engine='calamine')
 
-    # Automatically clean and make column names unique to prevent InvalidIndexError
-    for d in [sales_26, sales_25, quotes_26, quotes_25]:
-        d.columns = [str(col).strip() for col in d.columns]
-        cols = pd.Series(d.columns)
-        for dup in cols[cols.duplicated()].unique():
-            cols[cols == dup] = [
-                dup if i == 0 else f"{dup}.{i}" for i in range((cols == dup).sum())
-            ]
-        d.columns = cols.tolist()
+    # Explicitly clean and reassign each DataFrame
+    sales_26 = clean_columns(sales_26)
+    sales_25 = clean_columns(sales_25)
+    quotes_26 = clean_columns(quotes_26)
+    quotes_25 = clean_columns(quotes_25)
 
     sales_26['Year'] = '2026'
     sales_25['Year'] = '2025'
@@ -43,9 +55,11 @@ def load_data():
     sales['Type'] = 'Sales'
     quotes['Type'] = 'Quotes'
 
+    cols_to_keep = ['Year', 'Account Manager', 'Country', 'Brand Name', 'Amount', 'Currency', 'Type']
+
     return pd.concat([
-        sales[['Year', 'Account Manager', 'Country', 'Brand Name', 'Amount', 'Currency', 'Type']],
-        quotes[['Year', 'Account Manager', 'Country', 'Brand Name', 'Amount', 'Currency', 'Type']]
+        sales[cols_to_keep],
+        quotes[cols_to_keep]
     ], ignore_index=True)
 
 df = load_data()

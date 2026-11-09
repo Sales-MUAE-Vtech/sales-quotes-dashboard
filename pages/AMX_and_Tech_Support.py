@@ -1,17 +1,43 @@
 import streamlit as st
 import pandas as pd
 import io
+import glob
+import os
 
 # 1. Page Configuration
 st.set_page_config(layout="wide", page_title="AMX & Tech Support Dashboard")
 
-st.markdown("""
+# Month configuration and file folder mapping
+MONTH_CONFIG = {
+    "August 2026": {
+        "folder": "2026_August/AMX",
+        "file_tag": "2026-Aug"
+    },
+    "September 2026": {
+        "folder": "2026_September/AMX",
+        "file_tag": "2026-Sep"
+    },
+    "October 2026": {
+        "folder": "2026_October/AMX",
+        "file_tag": "2026-Oct"
+    }
+}
+
+# Sidebar: Month Selection
+st.sidebar.header("Filter Dashboard")
+selected_month = st.sidebar.selectbox("Select Month", list(MONTH_CONFIG.keys()), index=0)
+
+cfg = MONTH_CONFIG[selected_month]
+folder_path = cfg["folder"]
+file_tag = cfg["file_tag"]
+
+st.markdown(f"""
 <h1 style='text-align: center; margin-bottom: 0px;'>AMX Sales & Tech Support Dashboard</h1>
-<h4 style='text-align: center; margin-top: 5px; font-weight: normal;'>(August 2026 Summary)</h4>
+<h4 style='text-align: center; margin-top: 5px; font-weight: normal;'>({selected_month} Summary)</h4>
 <hr>
 """, unsafe_allow_html=True)
 
-# EXACT Allowed Reps (Exactly as you typed them)
+# EXACT Allowed Reps
 ALLOWED_REPS = [
     "Bibars Stas",
     "Raja Govindarajan",
@@ -22,13 +48,11 @@ ALLOWED_REPS = [
     "Kanagaraj Seeni"
 ]
 
-# Custom function to ensure names map perfectly to your list
 def clean_rep_name(x):
     if pd.isna(x) or str(x).strip() == '' or str(x).lower() in ['nan', 'nat', 'none']:
         return 'No Rep Name'
     
     name = str(x).strip().title()
-    # Force exact matches for specific names
     if 'NOEL' in name.upper():
         return 'NOEL GOLEA JUNIO'
     if 'NEMER' in name.upper():
@@ -36,67 +60,90 @@ def clean_rep_name(x):
     
     return name
 
+def find_file(folder, pattern):
+    """Finds a matching file in the given directory or returns None."""
+    matches = glob.glob(os.path.join(folder, pattern))
+    return matches[0] if matches else None
+
 # 2. Load Data Function
 @st.cache_data
-def load_data():
+def load_data(folder):
     try:
-        quotes_df = pd.read_excel('2026_August/AMX/AMX_Quotes-01-31Aug2026.xlsx', engine='calamine')
-        sales_df = pd.read_excel('2026_August/AMX/AMX_Sales-01-31Aug2026.xlsx', engine='calamine')
-        calendar_df = pd.read_excel('2026_August/AMX/Planning_calendar-all.xlsx', engine='calamine')
-        support_df = pd.read_excel('2026_August/AMX/KS-amx_cases_2026-08-01_to_2026-08-31.xlsx', engine='calamine')
+        # Flexible pattern lookup to handle varying month dates/names in filenames
+        q_file = find_file(folder, "*Quote*.xlsx")
+        s_file = find_file(folder, "*Sale*.xlsx")
+        c_file = find_file(folder, "*calendar*.xlsx")
+        t_file = find_file(folder, "*cases*.xlsx") or find_file(folder, "*support*.xlsx")
+
+        quotes_df = pd.read_excel(q_file, engine='calamine') if q_file else pd.DataFrame()
+        sales_df = pd.read_excel(s_file, engine='calamine') if s_file else pd.DataFrame()
+        calendar_df = pd.read_excel(c_file, engine='calamine') if c_file else pd.DataFrame()
+        support_df = pd.read_excel(t_file, engine='calamine') if t_file else pd.DataFrame()
         
         # =======================================
         # --- FIX COLUMNS (Exact Mapping) ---
         # =======================================
-        
-        if 'Rep Name' in quotes_df.columns: quotes_df.rename(columns={'Rep Name': 'Account Manager'}, inplace=True)
-        if 'Doc. Cur. Amount' in quotes_df.columns: quotes_df.rename(columns={'Doc. Cur. Amount': 'Quote Amount'}, inplace=True)
+        if not quotes_df.empty:
+            quotes_df.columns = [str(col).strip() for col in quotes_df.columns]
+            if 'Rep Name' in quotes_df.columns: quotes_df.rename(columns={'Rep Name': 'Account Manager'}, inplace=True)
+            if 'Doc. Cur. Amount' in quotes_df.columns: quotes_df.rename(columns={'Doc. Cur. Amount': 'Quote Amount'}, inplace=True)
             
-        if 'Rep Name' in sales_df.columns: sales_df.rename(columns={'Rep Name': 'Account Manager'}, inplace=True)
-        if 'Net Sales' in sales_df.columns: sales_df.rename(columns={'Net Sales': 'Sales Amount'}, inplace=True)
-        if 'Net Sales2' in sales_df.columns: sales_df.rename(columns={'Net Sales2': 'Sales Amount in AED'}, inplace=True)
+        if not sales_df.empty:
+            sales_df.columns = [str(col).strip() for col in sales_df.columns]
+            if 'Rep Name' in sales_df.columns: sales_df.rename(columns={'Rep Name': 'Account Manager'}, inplace=True)
+            if 'Net Sales' in sales_df.columns: sales_df.rename(columns={'Net Sales': 'Sales Amount'}, inplace=True)
+            if 'Net Sales2' in sales_df.columns: sales_df.rename(columns={'Net Sales2': 'Sales Amount in AED'}, inplace=True)
             
-        if 'Rep Name' in calendar_df.columns: calendar_df.rename(columns={'Rep Name': 'Account Manager'}, inplace=True)
-        if 'Support_Mode' in support_df.columns: support_df.rename(columns={'Support_Mode': 'Support Mode'}, inplace=True)
+        if not calendar_df.empty:
+            calendar_df.columns = [str(col).strip() for col in calendar_df.columns]
+            if 'Rep Name' in calendar_df.columns: calendar_df.rename(columns={'Rep Name': 'Account Manager'}, inplace=True)
+
+        if not support_df.empty:
+            support_df.columns = [str(col).strip() for col in support_df.columns]
+            if 'Support_Mode' in support_df.columns: support_df.rename(columns={'Support_Mode': 'Support Mode'}, inplace=True)
 
         # =======================================
         # --- DATA CLEANUP & FORMATTING ---
         # =======================================
         for df in [quotes_df, sales_df, calendar_df]:
-            if 'Account Manager' not in df.columns:
-                df['Account Manager'] = 'No Rep Name'
-            # Apply our strict name-cleaning function
-            df['Account Manager'] = df['Account Manager'].apply(clean_rep_name)
+            if not df.empty:
+                if 'Account Manager' not in df.columns:
+                    df['Account Manager'] = 'No Rep Name'
+                df['Account Manager'] = df['Account Manager'].apply(clean_rep_name)
 
-        if 'Quote Currency' in quotes_df.columns:
+        if not quotes_df.empty and 'Quote Currency' in quotes_df.columns:
             quotes_df['Quote Currency'] = quotes_df['Quote Currency'].apply(lambda x: str(x).strip().upper() if pd.notna(x) else pd.NA)
-        if 'Currency' in sales_df.columns:
+        if not sales_df.empty and 'Currency' in sales_df.columns:
             sales_df['Currency'] = sales_df['Currency'].apply(lambda x: str(x).strip().upper() if pd.notna(x) else pd.NA)
 
-        if 'Quote Amount' in quotes_df.columns: quotes_df['Quote Amount'] = pd.to_numeric(quotes_df['Quote Amount'], errors='coerce').fillna(0)
-        if 'Sales Amount' in sales_df.columns: sales_df['Sales Amount'] = pd.to_numeric(sales_df['Sales Amount'], errors='coerce').fillna(0)
-        if 'Sales Amount in AED' in sales_df.columns: sales_df['Sales Amount in AED'] = pd.to_numeric(sales_df['Sales Amount in AED'], errors='coerce').fillna(0)
+        if not quotes_df.empty and 'Quote Amount' in quotes_df.columns: 
+            quotes_df['Quote Amount'] = pd.to_numeric(quotes_df['Quote Amount'], errors='coerce').fillna(0)
+        if not sales_df.empty and 'Sales Amount' in sales_df.columns: 
+            sales_df['Sales Amount'] = pd.to_numeric(sales_df['Sales Amount'], errors='coerce').fillna(0)
+        if not sales_df.empty and 'Sales Amount in AED' in sales_df.columns: 
+            sales_df['Sales Amount in AED'] = pd.to_numeric(sales_df['Sales Amount in AED'], errors='coerce').fillna(0)
 
         return quotes_df, sales_df, calendar_df, support_df
     
     except Exception as e:
-        st.error(f"Error loading files: {e}")
+        st.error(f"Error loading files from {folder}: {e}")
         return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
-quotes_df, sales_df, calendar_df, support_df = load_data()
+quotes_df, sales_df, calendar_df, support_df = load_data(folder_path)
 
 # ==========================================
 # 3. Sidebar Filters
 # ==========================================
-st.sidebar.header("Filter Dashboard")
 st.sidebar.subheader("AMX Sales Filters")
-
 selected_manager = st.sidebar.multiselect("Select Account Manager", ALLOWED_REPS)
 
 if selected_manager:
-    if not quotes_df.empty and 'Account Manager' in quotes_df.columns: quotes_df = quotes_df[quotes_df['Account Manager'].isin(selected_manager)]
-    if not sales_df.empty and 'Account Manager' in sales_df.columns: sales_df = sales_df[sales_df['Account Manager'].isin(selected_manager)]
-    if not calendar_df.empty and 'Account Manager' in calendar_df.columns: calendar_df = calendar_df[calendar_df['Account Manager'].isin(selected_manager)]
+    if not quotes_df.empty and 'Account Manager' in quotes_df.columns: 
+        quotes_df = quotes_df[quotes_df['Account Manager'].isin(selected_manager)]
+    if not sales_df.empty and 'Account Manager' in sales_df.columns: 
+        sales_df = sales_df[sales_df['Account Manager'].isin(selected_manager)]
+    if not calendar_df.empty and 'Account Manager' in calendar_df.columns: 
+        calendar_df = calendar_df[calendar_df['Account Manager'].isin(selected_manager)]
 
 # ==========================================
 # SECTION A: AMX SALES & ACTIVITIES
@@ -150,7 +197,8 @@ amx_metrics_order = [
 ]
 
 for col in amx_metrics_order:
-    if col not in amx_full_summary.columns: amx_full_summary[col] = 0
+    if col not in amx_full_summary.columns: 
+        amx_full_summary[col] = 0
 
 amx_full_summary = amx_full_summary[amx_metrics_order]
 
@@ -159,22 +207,25 @@ if not amx_full_summary.empty:
 
     columns_multiindex = []
     for col in amx_full_summary.columns:
-        if col in ['Appointments Made', 'Calls Made', 'AMX Product Demo Made']: columns_multiindex.append(('CRM', col))
-        elif 'Quote' in col: columns_multiindex.append(('QUOTATIONS MADE', col))
-        elif 'Sale' in col: columns_multiindex.append(('SALES MADE', col))
-        else: columns_multiindex.append(('', col))
+        if col in ['Appointments Made', 'Calls Made', 'AMX Product Demo Made']: 
+            columns_multiindex.append(('CRM', col))
+        elif 'Quote' in col: 
+            columns_multiindex.append(('QUOTATIONS MADE', col))
+        elif 'Sale' in col: 
+            columns_multiindex.append(('SALES MADE', col))
+        else: 
+            columns_multiindex.append(('', col))
             
     amx_full_summary.columns = pd.MultiIndex.from_tuples(columns_multiindex)
     amx_full_summary.index.name = "Account Manager"
 
-    # Define Formatting
     float_cols = [c for c in amx_full_summary.columns if 'Value' in c[1] or 'Converted' in c[1]]
     int_cols = [c for c in amx_full_summary.columns if c not in float_cols]
     
     format_dict = {col: "{:,.2f}" for col in float_cols}
-    for col in int_cols: format_dict[col] = "{:,.0f}"
+    for col in int_cols: 
+        format_dict[col] = "{:,.0f}"
 
-    # --- PANDAS STYLING FOR AMX TABLE ---
     def color_zeros(val):
         try:
             v = float(str(val).replace(',', ''))
@@ -196,7 +247,6 @@ if not amx_full_summary.empty:
 
     styled_amx = amx_full_summary.style.format(format_dict).map(color_zeros)
     
-    # Apply Index Header Colors (Requires Pandas >= 1.4.0 which Streamlit uses)
     if hasattr(styled_amx, 'apply_index'):
         styled_amx = styled_amx.apply_index(lambda s: [style_amx_headers_0(v) for v in s], axis=1, level=0)
         styled_amx = styled_amx.apply_index(lambda s: [style_amx_headers_1(v) for v in s], axis=1, level=1)
@@ -239,7 +289,6 @@ if not support_df.empty:
             
             status_df = pd.DataFrame({"Category": cat_data["Category"], "Count": counts})
 
-            # Style Category Table
             styled_status = status_df.style.apply_index(
                 lambda s: ['background-color: #0052cc; color: white; font-weight: bold;' if v == 'Category' else 'background-color: #cc3300; color: white; font-weight: bold;' if v == 'Count' else '' for v in s], axis=1
             )
@@ -264,7 +313,6 @@ if not support_df.empty:
             
         mode_df = pd.DataFrame(mode_data)
 
-        # Style Mode Table
         styled_mode = mode_df.style.apply_index(
             lambda s: ['background-color: #006699; color: white; font-weight: bold;' if v == 'Support Mode' else 'background-color: #009933; color: white; font-weight: bold;' if v == 'Total' else '' for v in s], axis=1
         )
@@ -274,7 +322,7 @@ else:
     st.info("No Technical Support data available.")
 
 # ==========================================
-# SECTION C: EXPORT TO EXCEL (SEPARATE FILES)
+# SECTION C: EXPORT TO EXCEL
 # ==========================================
 st.markdown("---")
 st.subheader("Export Reports")
@@ -297,7 +345,13 @@ col1, col2 = st.columns(2)
 with col1:
     if not amx_full_summary.empty:
         amx_excel_data = convert_df_to_excel(amx_full_summary, sheet_name="AMX Summary")
-        st.download_button(label="Download AMX Report (Excel)", data=amx_excel_data, file_name="AMX_Activities_Quotes_Sales_Summary-2026-Aug.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", type="primary")
+        st.download_button(
+            label="Download AMX Report (Excel)", 
+            data=amx_excel_data, 
+            file_name=f"AMX_Activities_Quotes_Sales_Summary-{file_tag}.xlsx", 
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", 
+            type="primary"
+        )
 
 with col2:
     if not status_df.empty or not mode_df.empty:
@@ -305,4 +359,10 @@ with col2:
         if not status_df.empty: tech_support_sheets['Ticket Categories'] = status_df
         if not mode_df.empty: tech_support_sheets['Support Modes'] = mode_df
         tech_excel_data = convert_multiple_dfs_to_excel(tech_support_sheets)
-        st.download_button(label="Download Tech Support Report (Excel)", data=tech_excel_data, file_name="Tech_Support_Summary-2026-Aug.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", type="primary")
+        st.download_button(
+            label="Download Tech Support Report (Excel)", 
+            data=tech_excel_data, 
+            file_name=f"Tech_Support_Summary-{file_tag}.xlsx", 
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", 
+            type="primary"
+        )

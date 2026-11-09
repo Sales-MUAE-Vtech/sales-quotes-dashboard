@@ -21,21 +21,24 @@ def load_data():
     # Automatically clean and make column names unique to prevent InvalidIndexError
     for d in [sales_26, sales_25, quotes_26, quotes_25]:
         d.columns = [str(col).strip() for col in d.columns]
-        # Appends a suffix (.1, .2) to any duplicate column names so pandas accepts them
         cols = pd.Series(d.columns)
-for dup in cols[cols.duplicated()].unique():
-    cols[cols == dup] = [
-        dup if i == 0 else f"{dup}.{i}" for i in range((cols == dup).sum())
-    ]
-d.columns = cols
+        for dup in cols[cols.duplicated()].unique():
+            cols[cols == dup] = [
+                dup if i == 0 else f"{dup}.{i}" for i in range((cols == dup).sum())
+            ]
+        d.columns = cols.tolist()
 
     sales_26['Year'] = '2026'
     sales_25['Year'] = '2025'
     quotes_26['Year'] = '2026'
     quotes_25['Year'] = '2025'
 
-    sales = pd.concat([sales_26, sales_25], ignore_index=True).rename(columns={'Rep Name': 'Account Manager', 'Net Sales2': 'Amount'})
-    quotes = pd.concat([quotes_26, quotes_25], ignore_index=True).rename(columns={'Rep Name': 'Account Manager', 'Doc. Cur. Amount': 'Amount', 'Quote Currency': 'Currency'})
+    sales = pd.concat([sales_26, sales_25], ignore_index=True).rename(
+        columns={'Rep Name': 'Account Manager', 'Net Sales2': 'Amount'}
+    )
+    quotes = pd.concat([quotes_26, quotes_25], ignore_index=True).rename(
+        columns={'Rep Name': 'Account Manager', 'Doc. Cur. Amount': 'Amount', 'Quote Currency': 'Currency'}
+    )
 
     sales['Type'] = 'Sales'
     quotes['Type'] = 'Quotes'

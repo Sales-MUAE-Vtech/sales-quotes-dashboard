@@ -360,7 +360,7 @@ with col2:
         if not mode_df.empty: tech_support_sheets['Support Modes'] = mode_df
         tech_excel_data = convert_multiple_dfs_to_excel(tech_support_sheets)
         st.download_button(
-            label="Download Tech Support Report (Excelll)", 
+            label="Download Tech Support Report (Excel)", 
             data=tech_excel_data, 
             file_name=f"Tech_Support_Summary-{file_tag}.xlsx", 
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", 

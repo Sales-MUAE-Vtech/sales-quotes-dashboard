@@ -142,13 +142,13 @@ def load_data(folder):
 
 quotes_df, sales_df, calendar_df, support_df = load_data(folder_path)
 
-with st.sidebar.expander("📁 Loaded Files Status", expanded=True):
-    st.write(f"**Selected Folder:** `{folder_path}`")
-    st.write(f"**Support Rows Found:** {len(support_df)}")
-    if not support_df.empty:
-        st.write("**Support Columns:**", list(support_df.columns))
-    else:
-        st.warning("⚠️ Support file not loaded (0 rows or file missing).")
+# with st.sidebar.expander("📁 Loaded Files Status", expanded=True):
+#    st.write(f"**Selected Folder:** `{folder_path}`")
+#    st.write(f"**Support Rows Found:** {len(support_df)}")
+#    if not support_df.empty:
+#        st.write("**Support Columns:**", list(support_df.columns))
+#    else:
+#        st.warning("⚠️ Support file not loaded (0 rows or file missing).")
 
 # ==========================================
 # 3. Sidebar Filters

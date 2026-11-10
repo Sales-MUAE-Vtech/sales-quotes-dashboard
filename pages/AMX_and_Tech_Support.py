@@ -60,25 +60,36 @@ def clean_rep_name(x):
     
     return name
 
-def find_file(folder, pattern):
-    """Finds a matching file in the given directory or returns None."""
-    matches = glob.glob(os.path.join(folder, pattern))
-    return matches[0] if matches else None
+def find_file(folder, keywords):
+    """
+    Finds a file in 'folder' that contains all given keywords,
+    ignoring case and matching any Excel extension (.xlsx, .xls, .xlsm).
+    """
+    if not os.path.exists(folder):
+        return None
+        
+    for f in os.listdir(folder):
+        f_lower = f.lower()
+        # Checks if all keywords exist in the filename and it's an Excel file
+        if all(k.lower() in f_lower for k in keywords) and any(f_lower.endswith(ext) for ext in ['.xlsx', '.xls', '.xlsm', '']):
+            return os.path.join(folder, f)
+    return None
 
 # 2. Load Data Function
 @st.cache_data
 def load_data(folder):
     try:
-        # Flexible pattern lookup to handle varying month dates/names in filenames
-        q_file = find_file(folder, "*Quote*.xlsx")
-        s_file = find_file(folder, "*Sale*.xlsx")
-        c_file = find_file(folder, "*calendar*.xlsx")
-        t_file = find_file(folder, "*cases*.xlsx") or find_file(folder, "*support*.xlsx")
+        # Flexible multi-keyword match (case-insensitive)
+        q_file = find_file(folder, ["quote"])
+        s_file = find_file(folder, ["sale"])
+        c_file = find_file(folder, ["calendar"])
+        t_file = find_file(folder, ["cases"]) or find_file(folder, ["support"])
 
         quotes_df = pd.read_excel(q_file, engine='calamine') if q_file else pd.DataFrame()
         sales_df = pd.read_excel(s_file, engine='calamine') if s_file else pd.DataFrame()
         calendar_df = pd.read_excel(c_file, engine='calamine') if c_file else pd.DataFrame()
         support_df = pd.read_excel(t_file, engine='calamine') if t_file else pd.DataFrame()
+
         
         # =======================================
         # --- FIX COLUMNS (Exact Mapping) ---
@@ -130,6 +141,14 @@ def load_data(folder):
         return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
 quotes_df, sales_df, calendar_df, support_df = load_data(folder_path)
+
+with st.sidebar.expander("📁 Loaded Files Status", expanded=True):
+    st.write(f"**Selected Folder:** `{folder_path}`")
+    st.write(f"**Support Rows Found:** {len(support_df)}")
+    if not support_df.empty:
+        st.write("**Support Columns:**", list(support_df.columns))
+    else:
+        st.warning("⚠️ Support file not loaded (0 rows or file missing).")
 
 # ==========================================
 # 3. Sidebar Filters
